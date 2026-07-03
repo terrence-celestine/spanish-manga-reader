@@ -63,6 +63,8 @@ function ImageDisplay({
       const worker = await createWorker("spa");
       await worker.setParameters({
         tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+        whitelist: ["si", "yes", "sí"], // Add the Spanish word here
+        recognitionMode: "full",
       });
       return worker;
     })();
@@ -96,7 +98,12 @@ function ImageDisplay({
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     draggingRef.current = true;
     startRef.current = pointerToImage(e);
-    setBox({ left: startRef.current.x, top: startRef.current.y, width: 0, height: 0 });
+    setBox({
+      left: startRef.current.x,
+      top: startRef.current.y,
+      width: 0,
+      height: 0,
+    });
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
