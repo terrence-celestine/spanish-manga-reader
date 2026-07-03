@@ -1,4 +1,22 @@
 import pg from "pg";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+
+// Try loading environment variables from .env file
+if (typeof process.loadEnvFile === "function") {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const envPath = join(__dirname, "..", "..", ".env");
+    if (existsSync(envPath)) {
+      process.loadEnvFile(envPath);
+    } else {
+      process.loadEnvFile();
+    }
+  } catch {
+    // Ignore error if loading fails or file does not exist
+  }
+}
 
 const { Pool } = pg;
 

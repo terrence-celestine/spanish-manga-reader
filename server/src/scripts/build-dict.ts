@@ -20,6 +20,20 @@ import {
 
 const { Pool } = pg;
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Try loading environment variables from .env file
+if (typeof process.loadEnvFile === "function") {
+  try {
+    const envPath = join(__dirname, "..", "..", "..", ".env");
+    if (existsSync(envPath)) {
+      process.loadEnvFile(envPath);
+    } else {
+      process.loadEnvFile();
+    }
+  } catch {
+    // Ignore error if loading fails or file does not exist
+  }
+}
 const CACHE = join(__dirname, "..", "..", ".cache");
 const BASE = "https://raw.githubusercontent.com/doozan/spanish_data/master";
 const FILES = ["es-en.data", "es_allforms.csv", "frequency.csv"] as const;
