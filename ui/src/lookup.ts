@@ -14,7 +14,11 @@ export interface LookupResult {
   entries: DictEntry[];
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+let API_BASE = (import.meta.env.VITE_API_URL || "").trim();
+if (API_BASE && !API_BASE.startsWith("http://") && !API_BASE.startsWith("https://") && !API_BASE.startsWith("/")) {
+  API_BASE = `https://${API_BASE}`;
+}
+API_BASE = API_BASE.replace(/\/$/, "");
 
 export async function lookupWord(word: string): Promise<LookupResult> {
   const res = await fetch(`${API_BASE}/api/lookup?word=${encodeURIComponent(word)}`);
