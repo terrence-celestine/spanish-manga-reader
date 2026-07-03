@@ -14,8 +14,10 @@ export interface LookupResult {
   entries: DictEntry[];
 }
 
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
 export async function lookupWord(word: string): Promise<LookupResult> {
-  const res = await fetch(`/api/lookup?word=${encodeURIComponent(word)}`);
+  const res = await fetch(`${API_BASE}/api/lookup?word=${encodeURIComponent(word)}`);
   if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
   return (await res.json()) as LookupResult;
 }

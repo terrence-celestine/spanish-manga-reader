@@ -1,4 +1,5 @@
 import fastifyStatic from "@fastify/static";
+import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -8,6 +9,11 @@ import { lookup } from "./dictionary.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = Fastify({ logger: true });
+
+await app.register(cors, {
+  origin: "*", // Allow all origins for Vercel/external frontends
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+});
 
 // --- API ------------------------------------------------------------------
 app.get<{ Querystring: { word?: string } }>(
