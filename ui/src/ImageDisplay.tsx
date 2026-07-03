@@ -51,6 +51,16 @@ function ImageDisplay({
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const [box, setBox] = useState<DragBox | null>(null);
 
+  // Zoom and pan state
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [mode, setMode] = useState<"select" | "pan">("select");
+  const [spacePressed, setSpacePressed] = useState(false);
+
+  const spacePressedRef = useRef(false);
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
+  const panOffsetStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const cbRefs = useRef({ onWordsDetected, onTextDetected, onLoadingChange });
   useEffect(() => {
     cbRefs.current = { onWordsDetected, onTextDetected, onLoadingChange };
@@ -63,7 +73,6 @@ function ImageDisplay({
       const worker = await createWorker("spa");
       await worker.setParameters({
         tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
-        whitelist: ["si", "yes", "sí"], // Add the Spanish word here
         recognitionMode: "full",
       });
       return worker;
@@ -76,49 +85,146 @@ function ImageDisplay({
     };
   }, []);
 
-  // Reset the selection when a new image is loaded.
+  // Listen for spacebar to temporarily toggle pan mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.code === "Space" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        if (!spacePressedRef.current) {
+          spacePressedRef.current = true;
+          setSpacePressed(true);
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        spacePressedRef.current = false;
+        setSpacePressed(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // Keyboard shortcuts for mode selection (S for select, P for pan)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+      if (e.key.toLowerCase() === "s") {
+        setMode("select");
+      } else if (e.key.toLowerCase() === "p") {
+        setMode("pan");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Reset the selection and zoom when a new image is loaded.
   useEffect(() => {
     setBox(null);
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
     cbRefs.current.onWordsDetected([]);
     cbRefs.current.onTextDetected?.("");
   }, [imageURL]);
 
   const pointerToImage = (e: React.PointerEvent): { x: number; y: number } => {
     const img = imgRef.current!;
-    const r = img.getBoundingClientRect();
-    // Clamp to the image bounds so drags that leave the image still map inside.
-    const x = Math.max(0, Math.min(e.clientX - r.left, r.width));
-    const y = Math.max(0, Math.min(e.clientY - r.top, r.height));
-    return { x, y };
+    const container = img.closest(".select-container");
+    if (!container) return { x: 0, y: 0 };
+    const cr = container.getBoundingClientRect();
+
+    // Clamp pointer to container bounds
+    const px = Math.max(0, Math.min(e.clientX - cr.left, cr.width));
+    const py = Math.max(0, Math.min(e.clientY - cr.top, cr.height));
+
+    // Map from container coordinates to unscaled image coordinates:
+    // x = (px - offsetX) / scale
+    // y = (py - offsetY) / scale
+    const x = (px - offset.x) / scale;
+    const y = (py - offset.y) / scale;
+
+    // Clamp to the unscaled image bounds (0 to img.clientWidth)
+    const imgW = img.clientWidth;
+    const imgH = img.clientHeight;
+    return {
+      x: Math.max(0, Math.min(x, imgW)),
+      y: Math.max(0, Math.min(y, imgH)),
+    };
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!imgRef.current) return;
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    draggingRef.current = true;
-    startRef.current = pointerToImage(e);
-    setBox({
-      left: startRef.current.x,
-      top: startRef.current.y,
-      width: 0,
-      height: 0,
-    });
+
+    const isPanningMode = mode === "pan" || spacePressedRef.current;
+    if (isPanningMode) {
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      panOffsetStartRef.current = offset;
+    } else {
+      draggingRef.current = true;
+      startRef.current = pointerToImage(e);
+      setBox({
+        left: startRef.current.x,
+        top: startRef.current.y,
+        width: 0,
+        height: 0,
+      });
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggingRef.current || !startRef.current) return;
-    const cur = pointerToImage(e);
-    const s = startRef.current;
-    setBox({
-      left: Math.min(s.x, cur.x),
-      top: Math.min(s.y, cur.y),
-      width: Math.abs(cur.x - s.x),
-      height: Math.abs(cur.y - s.y),
-    });
+    if (panStartRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      const img = imgRef.current!;
+      const W = img.clientWidth;
+      const H = img.clientHeight;
+
+      let newX = panOffsetStartRef.current.x + dx;
+      let newY = panOffsetStartRef.current.y + dy;
+
+      const minX = W * (1 - scale);
+      const minY = H * (1 - scale);
+      newX = Math.max(minX, Math.min(newX, 0));
+      newY = Math.max(minY, Math.min(newY, 0));
+
+      setOffset({ x: newX, y: newY });
+    } else if (draggingRef.current && startRef.current) {
+      const cur = pointerToImage(e);
+      const s = startRef.current;
+      setBox({
+        left: Math.min(s.x, cur.x),
+        top: Math.min(s.y, cur.y),
+        width: Math.abs(cur.x - s.x),
+        height: Math.abs(cur.y - s.y),
+      });
+    }
   };
 
   const handlePointerUp = async (e: React.PointerEvent) => {
+    if (panStartRef.current) {
+      panStartRef.current = null;
+      return;
+    }
+
     if (!draggingRef.current || !startRef.current || !imgRef.current) return;
     draggingRef.current = false;
     const cur = pointerToImage(e);
@@ -133,11 +239,9 @@ function ImageDisplay({
     };
     setBox(dispBox);
 
-    // Ignore clicks / tiny drags.
     if (dispBox.width < MIN_DRAG || dispBox.height < MIN_DRAG) return;
 
     const img = imgRef.current;
-    // Map displayed-pixel box → natural-pixel rect.
     const scaleX = img.naturalWidth / img.clientWidth;
     const scaleY = img.naturalHeight / img.clientHeight;
     const rect: Rect = {
@@ -168,30 +272,157 @@ function ImageDisplay({
     }
   };
 
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = 1.1;
+    let nextScale = scale;
+    if (e.deltaY < 0) {
+      nextScale = Math.min(5, scale * zoomFactor);
+    } else {
+      nextScale = Math.max(1, scale / zoomFactor);
+    }
+
+    if (nextScale !== scale) {
+      const img = imgRef.current!;
+      const container = img.closest(".select-container");
+      if (!container) return;
+      const cr = container.getBoundingClientRect();
+      const px = e.clientX - cr.left;
+      const py = e.clientY - cr.top;
+
+      const ratio = nextScale / scale;
+      let nextOffsetX = px - (px - offset.x) * ratio;
+      let nextOffsetY = py - (py - offset.y) * ratio;
+
+      const W = img.clientWidth;
+      const H = img.clientHeight;
+      const minX = W * (1 - nextScale);
+      const minY = H * (1 - nextScale);
+      nextOffsetX = Math.max(minX, Math.min(nextOffsetX, 0));
+      nextOffsetY = Math.max(minY, Math.min(nextOffsetY, 0));
+
+      setScale(nextScale);
+      setOffset({ x: nextOffsetX, y: nextOffsetY });
+    }
+  };
+
+  const handleZoomIn = () => {
+    setScale((s) => {
+      const next = Math.min(5, s + 0.5);
+      if (imgRef.current) {
+        const W = imgRef.current.clientWidth;
+        const H = imgRef.current.clientHeight;
+        const px = W / 2;
+        const py = H / 2;
+        const ratio = next / s;
+        let nextOffsetX = px - (px - offset.x) * ratio;
+        let nextOffsetY = py - (py - offset.y) * ratio;
+        const minX = W * (1 - next);
+        const minY = H * (1 - next);
+        nextOffsetX = Math.max(minX, Math.min(nextOffsetX, 0));
+        nextOffsetY = Math.max(minY, Math.min(nextOffsetY, 0));
+        setOffset({ x: nextOffsetX, y: nextOffsetY });
+      }
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    setScale((s) => {
+      const next = Math.max(1, s - 0.5);
+      if (imgRef.current) {
+        const W = imgRef.current.clientWidth;
+        const H = imgRef.current.clientHeight;
+        const px = W / 2;
+        const py = H / 2;
+        const ratio = next / s;
+        let nextOffsetX = px - (px - offset.x) * ratio;
+        let nextOffsetY = py - (py - offset.y) * ratio;
+        const minX = W * (1 - next);
+        const minY = H * (1 - next);
+        nextOffsetX = Math.max(minX, Math.min(nextOffsetX, 0));
+        nextOffsetY = Math.max(minY, Math.min(nextOffsetY, 0));
+        setOffset({ x: nextOffsetX, y: nextOffsetY });
+      }
+      return next;
+    });
+  };
+
+  const handleResetZoom = () => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  };
+
   if (!imageURL) return null;
 
+  const isPanningMode = mode === "pan" || spacePressed;
+  const cursorStyle = isPanningMode
+    ? (panStartRef.current ? "grabbing" : "grab")
+    : "crosshair";
+
   return (
-    <div className="select-container">
-      <img
-        ref={imgRef}
-        src={imageURL}
-        alt="Uploaded"
-        draggable={false}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      />
-      {box && (
-        <div
-          className="selection-rect"
-          style={{
-            left: box.left,
-            top: box.top,
-            width: box.width,
-            height: box.height,
-          }}
+    <div className="select-container" style={{ overflow: "hidden" }} onWheel={handleWheel}>
+      <div
+        className="zoom-pan-wrapper"
+        style={{
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transformOrigin: "0 0",
+          position: "relative",
+          display: "inline-block",
+        }}
+      >
+        <img
+          ref={imgRef}
+          src={imageURL}
+          alt="Uploaded"
+          draggable={false}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          style={{ cursor: cursorStyle }}
         />
-      )}
+        {box && (
+          <div
+            className="selection-rect"
+            style={{
+              left: box.left,
+              top: box.top,
+              width: box.width,
+              height: box.height,
+            }}
+          />
+        )}
+      </div>
+
+      <div className="zoom-controls">
+        <button
+          type="button"
+          className={mode === "select" && !spacePressed ? "active" : ""}
+          onClick={() => setMode("select")}
+          title="Select Text (S)"
+        >
+          🔍
+        </button>
+        <button
+          type="button"
+          className={mode === "pan" || spacePressed ? "active" : ""}
+          onClick={() => setMode("pan")}
+          title="Pan Image (P or Hold Space)"
+        >
+          ✋
+        </button>
+        <div className="zoom-divider" style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
+        <button type="button" onClick={handleZoomOut} disabled={scale <= 1} title="Zoom Out">
+          -
+        </button>
+        <span className="zoom-level">{Math.round(scale * 100)}%</span>
+        <button type="button" onClick={handleZoomIn} disabled={scale >= 5} title="Zoom In">
+          +
+        </button>
+        <button type="button" onClick={handleResetZoom} disabled={scale === 1 && offset.x === 0 && offset.y === 0} title="Reset Zoom">
+          ↺
+        </button>
+      </div>
     </div>
   );
 }

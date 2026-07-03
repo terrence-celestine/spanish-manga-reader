@@ -17,6 +17,25 @@
   flex-shrink: 0;
 }
 
+.theme-toggle-btn {
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--accent-border);
+  background: var(--code-bg);
+}
+
 .open-btn {
   font-size: 14px;
   color: var(--text-h);
@@ -43,7 +62,7 @@
 .pager {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 .pager button {
   font-size: 18px;
@@ -65,6 +84,46 @@
   color: var(--text);
   min-width: 56px;
   text-align: center;
+}
+
+.page-slider {
+  width: 120px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.page-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.page-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.page-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.page-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
 }
 
 /* ---- Reader (viewer + sidebar) ---- */
@@ -91,6 +150,84 @@
   text-align: center;
 }
 
+/* ---- Drag and Drop Overlay ---- */
+.drop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.drop-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 500;
+  border: 3px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  padding: 40px 60px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.drop-icon {
+  font-size: 48px;
+}
+
+/* ---- Extraction Progress ---- */
+.extraction-progress-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 15vh;
+  width: 100%;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.progress-bar-wrapper {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s ease;
+  opacity: 0.3;
+}
+
+.progress-text {
+  position: relative;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-h);
+  z-index: 1;
+}
+
 /* ---- Selectable page image (from ImageDisplay) ---- */
 .select-container {
   position: relative;
@@ -111,6 +248,62 @@
   background: var(--accent-bg);
   pointer-events: none;
   box-sizing: border-box;
+}
+
+/* ---- Zoom Controls ---- */
+.zoom-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+}
+
+.zoom-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-h);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.zoom-controls button:hover {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zoom-controls button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.zoom-level {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 0 8px;
+  color: var(--text);
+  min-width: 40px;
+  text-align: center;
 }
 
 /* ---- Sidebar ---- */

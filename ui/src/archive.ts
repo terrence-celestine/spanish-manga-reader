@@ -32,7 +32,10 @@ function naturalCompare(a: string, b: string): number {
  * Open an archive and return its image pages in reading order.
  * Object URLs are created for each page; call revokePages() when done.
  */
-export async function extractPages(file: File): Promise<Page[]> {
+export async function extractPages(
+  file: File,
+  onProgress?: (current: number, total: number) => void,
+): Promise<Page[]> {
   ensureInit();
   const archive = await Archive.open(file);
   const entries = (await archive.getFilesArray()) as ArchiveEntry[];
@@ -43,9 +46,14 @@ export async function extractPages(file: File): Promise<Page[]> {
     .sort((a, b) => naturalCompare(a.full, b.full));
 
   const pages: Page[] = [];
-  for (const { entry } of images) {
+  const total = images.length;
+  if (onProgress) onProgress(0, total);
+
+  for (let i = 0; i < total; i++) {
+    const { entry } = images[i];
     const extracted = await entry.file.extract();
     pages.push({ name: entry.file.name, url: URL.createObjectURL(extracted) });
+    if (onProgress) onProgress(i + 1, total);
   }
 
   await archive.close?.();
