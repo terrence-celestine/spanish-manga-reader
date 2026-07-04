@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createWorker, PSM, type Worker } from "tesseract.js";
 import { cropAndPreprocess, type Rect } from "./ocr";
+import { correctWords } from "./correct";
 
 interface ImageDisplayProps {
   imageURL: string;
@@ -12,11 +13,17 @@ interface ImageDisplayProps {
 // Minimum drag size (in displayed pixels) to count as a selection rather than a click.
 const MIN_DRAG = 8;
 
+// Joins words that are split across lines with a hyphen/dash.
+function joinHyphenatedWords(text: string): string {
+  return text.replace(/[-­–—\u2010\u2011]\s*[\r\n]+\s*/g, "");
+}
+
 // Extract Spanish words from OCR'd text: keep letters (incl. accents/ñ/ü),
 // lowercase, split on everything else, drop empties + 1-char noise tokens,
 // de-dupe preserving order.
 function extractSpanishWords(text: string): string[] {
-  const matches = text.toLowerCase().match(/[a-zñáéíóúü]+/gi) ?? [];
+  const cleanedText = joinHyphenatedWords(text);
+  const matches = cleanedText.toLowerCase().match(/[a-zñáéíóúü]+/gi) ?? [];
   const seen = new Set<string>();
   const words: string[] = [];
   for (const word of matches) {
@@ -261,8 +268,10 @@ function ImageDisplay({
       const { data } = await worker.recognize(canvas);
 
       const text = (data.text || "").trim();
-      onTextDetected?.(text);
-      onWordsDetected(extractSpanishWords(text));
+      const processedText = joinHyphenatedWords(text);
+      onTextDetected?.(processedText);
+      const words = extractSpanishWords(processedText);
+      onWordsDetected(await correctWords(words));
     } catch (error) {
       console.error("OCR error:", error);
       onWordsDetected([]);
@@ -273,6 +282,9 @@ function ImageDisplay({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
+    // Plain wheel / two-finger scroll should scroll the page — only zoom when a
+    // modifier is held (browsers also send trackpad pinch as ctrl+wheel).
+    if (!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     const zoomFactor = 1.1;
     let nextScale = scale;
@@ -394,7 +406,7 @@ function ImageDisplay({
         )}
       </div>
 
-      <div className="zoom-controls">
+      <div className="zoom-controls" title="Scroll to move the page · Ctrl/⌘ + scroll to zoom">
         <button
           type="button"
           className={mode === "select" && !spacePressed ? "active" : ""}

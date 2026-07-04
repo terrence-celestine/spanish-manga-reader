@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lookup } from "./dictionary.js";
+import { correctWords } from "./correction.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,22 @@ app.get<{ Querystring: { word?: string } }>(
     } catch (err) {
       req.log.error(err);
       return reply.code(500).send({ error: "Lookup failed" });
+    }
+  },
+);
+
+app.post<{ Body: { words?: unknown } }>(
+  "/api/correct",
+  async (req, reply) => {
+    const words = req.body?.words;
+    if (!Array.isArray(words) || !words.every((w) => typeof w === "string")) {
+      return reply.code(400).send({ error: "Body must be { words: string[] }" });
+    }
+    try {
+      return { words: await correctWords(words) };
+    } catch (err) {
+      req.log.error(err);
+      return reply.code(500).send({ error: "Correction failed" });
     }
   },
 );
