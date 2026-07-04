@@ -15,6 +15,19 @@ included (`corriste` → *correr* → "to run").
 
 Navigate with the arrow keys, the pager, or the page slider.
 
+## Features
+
+- **Zoom & Pan**: Smooth zooming up to 500% using the zoom buttons or the mouse wheel. Switch to Pan mode (or hold the Spacebar) to drag and navigate around large pages.
+- **Keyboard Shortcuts**:
+  - `ArrowLeft` / `ArrowRight`: Navigate to the previous or next page.
+  - `S`: Switch to Select (OCR) mode.
+  - `P`: Switch to Pan mode.
+  - `Space` (hold): Temporarily activate Pan mode.
+- **OCR Correction**: Automatically corrects common OCR errors (such as `l` vs `i` confusion, correcting `sl` to `sí` or `si`) against the dictionary database.
+- **Hyphenation Joining**: Automatically reconstructs hyphenated words split across line breaks (e.g., `al-` and `gunas` becomes `algunas`) so they can be looked up as a single word.
+- **Reading Progress**: Automatically saves and restores your current page index per manga file using `localStorage`.
+- **Theme Toggle**: Full light and dark mode support with system preference detection and persistence.
+
 ## Architecture
 
 ```
